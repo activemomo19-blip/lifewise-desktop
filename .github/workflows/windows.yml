@@ -1,0 +1,51 @@
+name: Build Windows installer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Extract standalone desktop project
+        shell: pwsh
+        run: Expand-Archive desktop-source.zip -DestinationPath app
+      - name: Install locked dependencies
+        working-directory: app
+        run: npm ci
+      - name: Test navigation security
+        working-directory: app
+        run: npm test
+      - name: Build Windows x64 NSIS installer
+        working-directory: app
+        run: npm run build:win
+      - name: Verify installer and silent install/uninstall
+        shell: pwsh
+        working-directory: app
+        run: |
+          $installer = (Resolve-Path release/LifeWise-Setup-1.0.0.exe).Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'LifeWise-QA'
+          $p = Start-Process $installer -ArgumentList '/S',"/D=$installDir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installer exit code $($p.ExitCode)" }
+          $exe = Join-Path $installDir 'LifeWise.exe'
+          if (!(Test-Path $exe)) { throw 'Installed LifeWise.exe missing' }
+          $version = (Get-Item $exe).VersionInfo.ProductVersion
+          if ($version -notlike '1.0.0*') { throw "Unexpected version $version" }
+          $uninstaller = Join-Path $installDir 'Uninstall LifeWise.exe'
+          if (!(Test-Path $uninstaller)) { throw 'Uninstaller missing' }
+          $u = Start-Process $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "Uninstaller exit code $($u.ExitCode)" }
+          Start-Sleep -Seconds 5
+          if (Test-Path $exe) { throw 'Uninstall did not remove LifeWise.exe' }
+          Get-FileHash $installer -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LifeWise-Windows-1.0.0
+          path: app/release/LifeWise-Setup-1.0.0.exe
+          if-no-files-found: error
+          retention-days: 30
