@@ -1,6 +1,6 @@
 # LifeWise desktop
 
-A small Electron window loading **https://my.lifewiseapp.com**, the existing live Base44 member app. No frontend copy, database, membership logic or iOS project is included. Lovable is used only for the separate marketing/download site.
+LifeWise desktop brings your habits, schedule and goals together in a dedicated app. Sign in with your existing LifeWise account at **https://my.lifewiseapp.com**.
 
 ## Run and build
 
@@ -23,6 +23,20 @@ For future versions, change `version` in package.json, update the lockfile with 
 macOS public distribution requires a **Developer ID Application** identity (with private key), plus Apple notarisation credentials. An iOS Apple Distribution certificate is not a replacement. Configure the signing identity/certificate through electron-builder's supported `CSC_LINK`/`CSC_KEY_PASSWORD` or your unlocked keychain, and notarisation through `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` or a supported App Store Connect API key. Do not commit credentials. The normal configuration keeps hardened runtime enabled; the separate ad-hoc test configuration does not use hardened runtime because ad-hoc and vendor framework signatures have no shared signing team. This does not disable Gatekeeper or change machine security settings.
 
 Windows public releases should be Authenticode-signed with a publisher certificate or approved signing service. Without one, the installer is unsigned and may show Windows reputation/publisher warnings. Never claim an unsigned package is signed or bypass OS security warnings.
+
+For manual notarisation using a local Keychain profile (no password in source or shell arguments):
+
+```sh
+# Run once, entering your own Apple ID/team and the app-specific password securely.
+xcrun notarytool store-credentials LifeWise-Desktop
+# After building a Developer ID signed DMG:
+xcrun notarytool submit release/LifeWise-1.0.0.dmg --keychain-profile LifeWise-Desktop --wait
+# Only after Apple reports Accepted:
+xcrun stapler staple release/LifeWise-1.0.0.dmg
+xcrun stapler validate release/LifeWise-1.0.0.dmg
+```
+
+If a wait times out, use `notarytool info` or `notarytool wait` with the returned submission ID. Do not upload another copy merely because Apple's processing is still in progress. Record final checksums after stapling, then test the final package and publish its permanent release asset.
 
 ## Security and sessions
 
